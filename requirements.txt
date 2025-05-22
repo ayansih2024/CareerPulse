@@ -1,8 +1,7 @@
-    streamlit==1.45.1
-    numpy==2.2.6
-    pandas==2.2.3
-    altair==5.5.0
-    sendgrid==6.11.1
-    scikit-learn==1.6.1
-    requests
-    
+streamlit==1.45.1
+numpy==2.2.6
+pandas==2.2.3
+altair==5.5.0
+sendgrid==6.12.2
+scikit-learn==1.6.1
+requests==2.32.3
