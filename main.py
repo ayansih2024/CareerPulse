@@ -7,6 +7,7 @@ import os
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 import ssl
+import time # Import time for the progress indicator
 
 # Disable SSL verification (remove after fixing certificate issue)
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -275,8 +276,6 @@ def classify_age(age):
 # -------------------------------
 # 🎨 HEADER
 # -------------------------------
-import streamlit as st
-
 st.set_page_config(
     page_title="Career Pulse",
     page_icon="logo.jpeg", # This sets your logo as the favicon
@@ -298,7 +297,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 st.markdown("---")
-df = pd.DataFrame(
+
+# Prepare DataFrame for salary chart
+df_salary = pd.DataFrame(
     {
         "Career": [k for k in CAREER_INFO],
         "Min Salary": [
@@ -306,19 +307,63 @@ df = pd.DataFrame(
             for v in CAREER_INFO.values()
         ],
         "Max Salary": [
-            int(v["salary"].split(" - ")[0].replace("$", "").replace(",", ""))
+            int(v["salary"].split(" - ")[1].replace("$", "").replace(",", "").replace("+", ""))
+            if len(v["salary"].split(" - ")) > 1 else
+            int(v["salary"].split(" - ")[0].replace("$", "").replace(",", "").replace("+", ""))
             for v in CAREER_INFO.values()
         ],
+        "Outlook": [v["outlook"] for v in CAREER_INFO.values()],
     }
 )
 
+st.subheader("📊 Career Salary Comparison")
+
+# Filters for the chart
+col1, col2 = st.columns(2)
+with col1:
+    selected_outlook = st.selectbox(
+        "Filter by Career Outlook",
+        ["All"] + sorted(list(df_salary["Outlook"].unique())),
+    )
+with col2:
+    sort_by = st.selectbox(
+        "Sort By", ["None", "Min Salary (Asc)", "Min Salary (Desc)", "Max Salary (Asc)", "Max Salary (Desc)"]
+    )
+
+filtered_df = df_salary.copy()
+
+# Apply outlook filter
+if selected_outlook != "All":
+    filtered_df = filtered_df[filtered_df["Outlook"] == selected_outlook]
+
+# Apply sorting
+if sort_by == "Min Salary (Asc)":
+    filtered_df = filtered_df.sort_values(by="Min Salary", ascending=True)
+elif sort_by == "Min Salary (Desc)":
+    filtered_df = filtered_df.sort_values(by="Min Salary", ascending=False)
+elif sort_by == "Max Salary (Asc)":
+    filtered_df = filtered_df.sort_values(by="Max Salary", ascending=True)
+elif sort_by == "Max Salary (Desc)":
+    filtered_df = filtered_df.sort_values(by="Max Salary", ascending=False)
+
+
+# Add a column to highlight the predicted career
+if 'predicted_career' in st.session_state:
+    filtered_df['Highlight'] = filtered_df['Career'].apply(lambda x: 'Predicted Career' if x == st.session_state.predicted_career else 'Other Careers')
+    color_scale = alt.Scale(domain=['Predicted Career', 'Other Careers'], range=['#FF4B4B', '#636EF6']) # Streamlit's primary color and a default blue
+else:
+    filtered_df['Highlight'] = 'Other Careers'
+    color_scale = alt.Scale(domain=['Other Careers'], range=['#636EF6'])
+
+
 chart = (
-    alt.Chart(df)
+    alt.Chart(filtered_df)
     .mark_bar()
     .encode(
-        x="Career:N",
+        x=alt.X("Career:N", sort=None), # Disable default sorting to respect pandas sort
         y="Max Salary:Q",
-        tooltip=["Career", "Min Salary", "Max Salary"],
+        color=alt.Color('Highlight', scale=color_scale, legend=None),
+        tooltip=["Career", "Min Salary", "Max Salary", "Outlook"],
     )
     .properties(width=700)
     .interactive()
@@ -335,7 +380,7 @@ name = st.sidebar.text_input("Enter Your Name")
 age = st.sidebar.slider("Select Your Age", 10, 55, 25)
 age_group = classify_age(age)
 st.sidebar.write(f"Age Group: {age_group}")
-email = st.sidebar.text_input("Enter Your Email") 
+email = st.sidebar.text_input("Enter Your Email")
 
 
 # Visualization Toggle
@@ -351,7 +396,7 @@ tabs = st.tabs(
         "🛠 Skills",
         "🎯 Interests",
         "🧠 Preferences",
-        "💡 Information", 
+        "💡 Information",
     ]
 )
 
@@ -458,7 +503,7 @@ with tabs[5]: # New tab content
 def send_career_email(user_email, recipient_name, job_title):
     """Sends an email with career details to the user."""
     print(f"send_career_email called with: {user_email}, {recipient_name}, {job_title}")  # DEBUG
-    
+
     SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
     if not SENDGRID_API_KEY:
         st.error(
@@ -466,13 +511,13 @@ def send_career_email(user_email, recipient_name, job_title):
         )
         return False
 
-    
-    career_info = CAREER_INFO.get(job_title)  
+
+    career_info = CAREER_INFO.get(job_title)
     if not career_info:
         st.error(f"Error: Could not find career information for '{job_title}'.")
         return False
 
-    
+
     html_content = f"""
     <!DOCTYPE html>
     <html>
@@ -501,16 +546,16 @@ def send_career_email(user_email, recipient_name, job_title):
     """
 
     message = Mail(
-        from_email="ayangantayat095@gmail.com",  
+        from_email="ayangantayat095@gmail.com",
         to_emails=user_email,
-        subject=f"Your CareerPulse Prediction: {job_title}!",  
+        subject=f"Your CareerPulse Prediction: {job_title}!",
         html_content=html_content,
     )
     try:
         sg = SendGridAPIClient(SENDGRID_API_KEY)
         print("Sending email...")  # DEBUG
         response = sg.send(message)
-        print("Email sent. Response:", response.status_code, response.body)  
+        print("Email sent. Response:", response.status_code, response.body)
         if 200 <= response.status_code < 300:
             return True
         else:
@@ -576,81 +621,84 @@ if st.button("🔍 Suggest Careers"):
             "Please rate your interest/skills/preferences in all the sections to get a prediction."
         )
     else:
-        st.subheader(f"Hi {name}, based on your profile:")
+        # Progress Indicator
+        with st.spinner("Analyzing your profile and suggesting careers..."):
+            time.sleep(2) # Simulate work being done
 
-        
-        input_data = [
-            age,
-            subjects["Maths - Algebra"],
-            subjects["Maths - Calculus"],
-            subjects["Science - Biology"],
-            subjects["Science - Chemistry"],
-            subjects["Science - Physics"],
-            subjects["Computer Science - Programming"],
-            subjects["Computer Science - Data Structures"],
-            subjects["History - Ancient"],
-            subjects["History - Modern"],
-            subjects["Economics - Microeconomics"],
-            subjects["Economics - Macroeconomics"],
-            subjects["Literature - Fiction"],
-            subjects["Literature - Poetry"],
-            subjects["Art - Painting"],
-            subjects["Art - Sculpture"],
-            skills["Problem Solving - Logical"],
-            skills["Problem Solving - Creative"],
-            skills["Creativity - Visual"],
-            skills["Creativity - Innovation"],
-            skills["Communication - Written"],
-            skills["Communication - Verbal"],
-            skills["Leadership - Team Management"],
-            skills["Leadership - Initiative"],
-            interests["Technology - Artificial Intelligence"],
-            interests["Technology - Cybersecurity"],
-            interests["Technology - Web Development"],
-            interests["Business - Marketing"],
-            interests["Business - Finance"],
-            interests["Business - Management"],
-            interests["Art And Design - Visual Arts"],
-            interests["Art And Design - Industrial Design"],
-            interests["Healthcare - Clinical Research"],
-            interests["Healthcare - Patient Care"],
-            interests["Education - Primary/Secondary"],
-            interests["Education - Higher Education"],
-            interests["Engineering - Mechanical"],
-            interests["Engineering - Electrical"],
-            interests["Writing - Creative Writing"],
-            interests["Writing - Technical Writing"],
-            1 if preferences["Enjoy solving complex problems?"] == "Yes" else 0,
-            1 if preferences["Prefer working with machines?"] == "Yes" else 0,
-            1 if preferences["Interested in research?"] == "Yes" else 0,
-            1 if preferences["Enjoy working with people?"] == "Yes" else 0,
-            1 if preferences["Prefer working indoors?"] == "Yes" else 0,
-        ]
-        input_vector = np.array(input_data).reshape(1, -1)
+            st.subheader(f"Hi {name}, based on your profile:")
 
-        try:
-            prediction = model.predict(input_vector)[0]
-            predicted_career = CAREER_OPTIONS[prediction]
-            st.session_state.predicted_career = predicted_career  # Store in session state
-            st.session_state.input_data = input_data
 
-            st.success(
-                f"🎯 We suggest you might find a fulfilling career as a **{predicted_career}**!"
-            )
-            st.info(
-                f"This suggestion is based on your interests, skills, and preferences."
-            )
+            input_data = [
+                age,
+                subjects["Maths - Algebra"],
+                subjects["Maths - Calculus"],
+                subjects["Science - Biology"],
+                subjects["Science - Chemistry"],
+                subjects["Science - Physics"],
+                subjects["Computer Science - Programming"],
+                subjects["Computer Science - Data Structures"],
+                subjects["History - Ancient"],
+                subjects["History - Modern"],
+                subjects["Economics - Microeconomics"],
+                subjects["Economics - Macroeconomics"],
+                subjects["Literature - Fiction"],
+                subjects["Literature - Poetry"],
+                subjects["Art - Painting"],
+                subjects["Art - Sculpture"],
+                skills["Problem Solving - Logical"],
+                skills["Problem Solving - Creative"],
+                skills["Creativity - Visual"],
+                skills["Creativity - Innovation"],
+                skills["Communication - Written"],
+                skills["Communication - Verbal"],
+                skills["Leadership - Team Management"],
+                skills["Leadership - Initiative"],
+                interests["Technology - Artificial Intelligence"],
+                interests["Technology - Cybersecurity"],
+                interests["Technology - Web Development"],
+                interests["Business - Marketing"],
+                interests["Business - Finance"],
+                interests["Business - Management"],
+                interests["Art And Design - Visual Arts"],
+                interests["Art And Design - Industrial Design"],
+                interests["Healthcare - Clinical Research"],
+                interests["Healthcare - Patient Care"],
+                interests["Education - Primary/Secondary"],
+                interests["Education - Higher Education"],
+                interests["Engineering - Mechanical"],
+                interests["Engineering - Electrical"],
+                interests["Writing - Creative Writing"],
+                interests["Writing - Technical Writing"],
+                1 if preferences["Enjoy solving complex problems?"] == "Yes" else 0,
+                1 if preferences["Prefer working with machines?"] == "Yes" else 0,
+                1 if preferences["Interested in research?"] == "Yes" else 0,
+                1 if preferences["Enjoy working with people?"] == "Yes" else 0,
+                1 if preferences["Prefer working indoors?"] == "Yes" else 0,
+            ]
+            input_vector = np.array(input_data).reshape(1, -1)
 
-        except Exception as e:
-            st.error(f"❗ An error occurred during prediction: {e}")
-            st.info(
-                "Please ensure the model is trained and loaded correctly....")
+            try:
+                prediction = model.predict(input_vector)[0]
+                predicted_career = CAREER_OPTIONS[prediction]
+                st.session_state.predicted_career = predicted_career  # Store in session state
+                st.session_state.input_data = input_data
+
+                st.success(
+                    f"🎯 We suggest you might find a fulfilling career as a **{predicted_career}**!"
+                )
+                st.info(
+                    f"This suggestion is based on your interests, skills, and preferences."
+                )
+
+            except Exception as e:
+                st.error(f"❗ An error occurred during prediction: {e}")
+                st.info(
+                    "Please ensure the model is trained and loaded correctly....")
 
 if 'predicted_career' in st.session_state:
     predicted_career = st.session_state.predicted_career
-    input_data = st.session_state.input_data
     send_email = st.checkbox("Send me more information via email")
-   
+
     if predicted_career:
         career_info = CAREER_INFO[predicted_career]
         st.write(f"**{predicted_career}**")
@@ -666,7 +714,7 @@ if 'predicted_career' in st.session_state:
                 st.success("Email sent successfully!")
             else:
                 st.error(
-                    "Failed to send email. Please check your email address and try again.  Please also check your SendGrid API key and ensure it is correctly configured."
+                    "Failed to send email. Please check your email address and try again. Please also check your SendGrid API key and ensure it is correctly configured."
                 )
 
 # Made By Ayan Gantayat(Anonymous)
