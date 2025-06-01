@@ -216,7 +216,7 @@ if not SENDGRID_API_KEY:
         st.error("Error: SendGrid API key is missing. Please configure it in your environment variables.")
         return False
 
-    career_info = CAREER_INFO.get(job_title)
+   career_info = CAREER_INFO.get(job_title)
     if not career_info:
         st.error(f"Error: Could not find career information for '{job_title}'.")
         return False
