@@ -976,18 +976,21 @@ def main_app():
                 <p><em>We're constantly improving to provide you with the best career guidance experience!</em></p>
             </div>
             """, unsafe_allow_html=True)
-
-    # -------------------------------
+# -------------------------------
     # 🔍 PREDICTION SECTION
     # -------------------------------
     st.markdown("---")
     st.markdown("### 🎯 Get Your Career Recommendation")
 
     if st.button("🔍 Analyze My Profile & Suggest Careers", type="primary"):
-        if not name:
-            st.warning("⚠️ Please enter your name to continue.")
-        elif not email:
-            st.warning("⚠️ Please enter your email address.")
+        # Use user_name from session_state
+        current_user_name = st.session_state.get('user_name', 'Guest')
+        current_user_email = st.session_state.get('user_email', 'N/A')
+
+        if current_user_name == 'Guest': # Check if a proper name was set during login
+            st.warning("⚠️ Please log in with your name to continue.")
+        elif current_user_email == 'N/A' or "@gmail.com" not in current_user_email: # Check for a valid email from session state
+            st.warning("⚠️ Please log in with a valid Gmail address.")
         elif not all(value is not None for value in subjects.values()) or not all(
             value is not None for value in skills.values()
         ) or not all(value is not None for value in interests.values()) or not all(
@@ -1038,7 +1041,7 @@ def main_app():
                     # Display prediction result
                     st.markdown(f"""
                     <div class="prediction-result">
-                        <h2>🎉 Congratulations, {name}!</h2>
+                        <h2>🎉 Congratulations, {current_user_name}!</h2>
                         <h3>Your recommended career path is:</h3>
                         <h1>🎯 {predicted_career}</h1>
                         <p>This recommendation is based on your unique profile of interests, skills, and preferences.</p>
@@ -1050,6 +1053,7 @@ def main_app():
                 except Exception as e:
                     st.error(f"❗ An error occurred during prediction: {e}")
                     st.info("Please ensure the model is trained and loaded correctly.")
+
 
     # -------------------------------
     # 📧 EMAIL & CAREER DETAILS
