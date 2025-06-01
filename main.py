@@ -212,7 +212,7 @@ def send_career_email(user_email, recipient_name, job_title):
     # It's highly recommended NOT to hardcode API keys directly in your code.
     # Use Streamlit secrets or environment variables for production.
 SENDGRID_API_KEY = st.secrets["SENDGRID_API_KEY"]
-    if not SENDGRID_API_KEY:
+ if not SENDGRID_API_KEY:
         st.error("Error: SendGrid API key is missing. Please configure it in your environment variables.")
         return False
 
