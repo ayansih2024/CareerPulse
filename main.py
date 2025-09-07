@@ -309,7 +309,6 @@ def send_career_email(user_email, recipient_name, job_title):
         return False
 
 
-    # --- END NEW ---
 
     html_content = f"""
     <!DOCTYPE html>
@@ -340,7 +339,7 @@ def send_career_email(user_email, recipient_name, job_title):
                 <p><strong>Salary Range:</strong> {career_info['salary']}</p>
                 <p><strong>Career Outlook:</strong> {career_info['outlook']}</p>
             </div>
-            {roadmap_html} <p>We encourage you to explore this career further and consider the next steps in your journey!</p>
+             <p>We encourage you to explore this career further and consider the next steps in your journey!</p>
                 <p><em>Please check your spam folder if you don't see this email in your inbox.</em></p>
                 
                 <p>Best regards,<br>
@@ -1165,7 +1164,7 @@ def main_app():
     if 'predicted_career' in st.session_state:
         predicted_career = st.session_state.predicted_career
         career_info = CAREER_INFO.get(predicted_career, {}) # Use .get() for safety
-        career_roadmap = CAREER_ROADMAPS.get(predicted_career, {}) # NEW: Get roadmap
+        
 
         st.markdown("### 📋 Your Career Details")
         
@@ -1183,28 +1182,7 @@ def main_app():
             </div>
             """, unsafe_allow_html=True)
             
-            # --- NEW: Display Roadmap Details ---
-            if career_roadmap:
-                st.markdown("### 🛣️ Career Roadmap")
-                if "phases" in career_roadmap and career_roadmap["phases"]:
-                    st.markdown("<h4>Phases of Development:</h4>")
-                    for phase in career_roadmap["phases"]:
-                        st.markdown(f"""
-                        <div class="roadmap-phase">
-                            <strong>{phase['title']}:</strong> {phase['description']}
-                        </div>
-                        """, unsafe_allow_html=True)
-                else:
-                    st.info(f"No detailed roadmap phases available for {predicted_career} yet.")
-
-                if "resources" in career_roadmap and career_roadmap["resources"]:
-                    st.markdown("<h4>📚 Key Resources:</h4>")
-                    for resource in career_roadmap["resources"]:
-                        st.markdown(f"- {resource}")
-                else:
-                    st.info(f"No specific resources listed for {predicted_career} yet.")
-            else:
-                st.info(f"No roadmap available for {predicted_career} yet. We are working on adding more career roadmaps!")
+          
             # --- END NEW ---
         
         with col2:
