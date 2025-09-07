@@ -779,19 +779,20 @@ def main_app():
 
         # Prepare DataFrame for salary chart
         df_salary = pd.DataFrame({
-            "Career": [k for k in CAREER_INFO], # Use CAREER_INFO directly
+            "Career": [k for k in CAREER_INFO],
             "Min Salary": [
                 int(v["salary"].split(" - ")[0].replace("$", "").replace(",", ""))
+                if " - " in v["salary"] else 0
                 for v in CAREER_INFO.values()
             ],
             "Max Salary": [
                 int(v["salary"].split(" - ")[1].replace("$", "").replace(",", "").replace("+", ""))
-                if len(v["salary"].split(" - ")) > 1 else
-                int(v["salary"].split(" - ")[0].replace("$", "").replace(",", "").replace("+", ""))
+                if " - " in v["salary"] else 0
                 for v in CAREER_INFO.values()
             ],
             "Outlook": [v["outlook"] for v in CAREER_INFO.values()],
         })
+
 
         # Filters in columns for better layout
         col1, col2, col3 = st.columns([2, 2, 1])
