@@ -10,7 +10,6 @@ import ssl
 import time
 
 # --- NEW: Import career_roadmaps.py ---
-from career_roadmaps import CAREER_ROADMAPS
 
 # Disable SSL verification (remove after fixing certificate issue)
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -309,19 +308,7 @@ def send_career_email(user_email, recipient_name, job_title):
         st.error(f"Error: Could not find career information for '{job_title}'.")
         return False
 
-    # --- NEW: Get roadmap details for the email ---
-    career_roadmap = CAREER_ROADMAPS.get(job_title, {})
-    roadmap_html = ""
-    if career_roadmap and "phases" in career_roadmap:
-        roadmap_html += "<h3>🛣️ Career Roadmap:</h3><ul>"
-        for phase in career_roadmap["phases"]:
-            roadmap_html += f"<li><strong>{phase['title']}:</strong> {phase['description']}</li>"
-        roadmap_html += "</ul>"
-    if career_roadmap and "resources" in career_roadmap:
-        roadmap_html += "<h4>📚 Key Resources:</h4><ul>"
-        for resource in career_roadmap["resources"]:
-            roadmap_html += f"<li>{resource}</li>"
-        roadmap_html += "</ul>"
+
     # --- END NEW ---
 
     html_content = f"""
